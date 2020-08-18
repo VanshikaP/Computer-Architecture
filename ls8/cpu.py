@@ -17,20 +17,35 @@ class CPU:
 
     def load(self):
         """Load a program into memory."""
-
+        
         address = 0
 
+        if len(sys.argv) < 2:
+            print('ERROR - Provide program address to load')
+            return
+        
+        program_filename = sys.argv[1]
+
+        program_text = open(program_filename).read()
+        program_lines = program_text.split('\n')
+        program = []
+
+        for line in program_lines:
+            blocks = line.split()
+            if len(blocks) > 0:
+                program.append(blocks[0])
+        
         # For now, we've just hardcoded a program:
 
-        program = [
-            # From print8.ls8
-            0b10000010, # LDI R0,8
-            0b00000000,
-            0b00001000,
-            0b01000111, # PRN R0
-            0b00000000,
-            0b00000001, # HLT
-        ]
+        # program = [
+        #     # From print8.ls8
+        #     0b10000010, # LDI R0,8
+        #     0b00000000,
+        #     0b00001000,
+        #     0b01000111, # PRN R0
+        #     0b00000000,
+        #     0b00000001, # HLT
+        # ]
 
         for instruction in program:
             self.ram[address] = instruction
@@ -73,6 +88,7 @@ class CPU:
 
     def run(self):
         """Run the CPU."""
+        print('****', self.ram)
         inst = None
 
         running = True
