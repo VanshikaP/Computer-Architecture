@@ -16,12 +16,18 @@ class CPU:
         self.MUL = 0b10100010
         self.PUSH = 0b01000101
         self.POP = 0b01000110
+        self.CALL = 0b01010000
+        self.RET = 0b00010001
+        self.ADD = 0b10100000
         self.instructions_table = {}
         self.instructions_table[self.LDI] = self.ldi
         self.instructions_table[self.PRN] = self.prn
         self.instructions_table[self.MUL] = self.mul
+        self.instructions_table[self.ADD] = self.add
         self.instructions_table[self.PUSH] = self.push
         self.instructions_table[self.POP] = self.pop
+        self.instructions_table[self.CALL] = self.call
+        self.instructions_table[self.RET] = self.ret
         self.sp = 0xF4
         self.reg[7] = self.sp
         pass
@@ -75,32 +81,61 @@ class CPU:
     def ldi(self):
         add = self.ram[self.pc + 1]
         value = self.ram[self.pc + 2]
+        # print('Load')
         self.reg[add] = value
         self.pc += 3
     
     def prn(self):
         add = self.ram[self.pc + 1]
         value = self.reg[add]
+        # print('Print')
         print(value)
         self.pc += 2
     
     def mul(self):
         add1 = self.ram_read(self.pc + 1)
         add2 = self.ram_read(self.pc + 2)
+        # print('Multiply')
         self.alu('MUL', add1, add2)
+        self.pc += 3
+
+    def add(self):
+        add1 = self.ram_read(self.pc + 1)
+        add2 = self.ram_read(self.pc + 2)
+        # print('Add')
+        self.alu('ADD', add1, add2)
         self.pc += 3
     
     def push(self):
         add = self.ram_read(self.pc + 1)
         self.sp -= 1
+        # print('Push')
         self.ram[self.sp] = self.reg[add]
         self.pc += 2
     
     def pop(self):
         add = self.ram_read(self.pc + 1)
+        # print('Pop')
         self.reg[add] = self.ram[self.sp]
         self.sp += 1
         self.pc += 2
+    
+    def call(self):
+        # print('Call')
+        self.sp -= 1
+        self.ram[self.sp] = self.pc + 2
+        # print('PC stored as', self.ram[self.sp])
+        self.pc = self.reg[self.ram[self.pc + 1]]
+    
+    def jump(self):
+        # print('Jump')
+        self.pc = self.ram[self.pc + 1]
+    
+    def ret(self):
+        # print('Return')
+        self.pc = self.ram[self.sp]
+        self.sp += 1
+
 
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
@@ -148,3 +183,5 @@ class CPU:
                 running = False
             else:
                 self.pc += 1
+            
+            # print('** PC', self.pc ,'Register', self.reg, 'Stack Pointer', self.sp)
