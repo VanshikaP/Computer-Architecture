@@ -9,6 +9,7 @@ class CPU:
         """Construct a new CPU."""
         self.ram = [None] * 256
         self.reg = [0] * 8
+        self.FL = [0] * 8
         self.pc = 0
         self.LDI = 0b10000010
         self.HLT = 0b00000001
@@ -19,6 +20,10 @@ class CPU:
         self.CALL = 0b01010000
         self.RET = 0b00010001
         self.ADD = 0b10100000
+        self.CMP = 0b10100111
+        self.JMP = 0b01010100
+        self.JEQ = 0b01010101
+        self.JNE = 0b01010110
         self.instructions_table = {}
         self.instructions_table[self.LDI] = self.ldi
         self.instructions_table[self.PRN] = self.prn
@@ -28,6 +33,10 @@ class CPU:
         self.instructions_table[self.POP] = self.pop
         self.instructions_table[self.CALL] = self.call
         self.instructions_table[self.RET] = self.ret
+        self.instructions_table[self.CMP] = self.compare
+        self.instructions_table[self.JMP] = self.jump
+        self.instructions_table[self.JEQ] = self.jump_if_equal
+        self.instructions_table[self.JNE] = self.jump_if_not_equal
         self.sp = 0xF4
         self.reg[7] = self.sp
         pass
@@ -128,15 +137,37 @@ class CPU:
         self.pc = self.reg[self.ram[self.pc + 1]]
     
     def jump(self):
-        # print('Jump')
-        self.pc = self.ram[self.pc + 1]
+        # print('Jump', self.reg[self.ram[self.pc + 1]])
+        self.pc = self.reg[self.ram[self.pc + 1]]
     
     def ret(self):
         # print('Return')
         self.pc = self.ram[self.sp]
         self.sp += 1
 
-
+    def compare(self):
+        add1 = self.ram_read(self.pc + 1)
+        add2 = self.ram_read(self.pc + 2)
+        # print('Compare')
+        self.alu('CMP', add1, add2)
+        self.pc += 3
+    
+    def jump_if_equal(self):
+        add = self.reg[self.ram[self.pc + 1]]
+        # print('Jump if equal', add)
+        if self.FL[7]:
+            self.pc = add
+        else:
+            self.pc += 2
+    
+    def jump_if_not_equal(self):
+        add = self.reg[self.ram[self.pc + 1]]
+        # print('Jump if not equal', add)
+        if self.FL[5] or self.FL[6]:
+            self.pc = add
+        else:
+            self.pc += 2
+    
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
 
@@ -144,6 +175,19 @@ class CPU:
             self.reg[reg_a] += self.reg[reg_b]
         elif op == "MUL":
             self.reg[reg_a] *= self.reg[reg_b]
+        elif op == "CMP":
+            if self.reg[reg_a] == self.reg[reg_b]:
+                self.FL[7] = 1
+                self.FL[5] = 0
+                self.FL[6] = 0
+            elif self.reg[reg_a] > self.reg[reg_b]:
+                self.FL[6] = 1
+                self.FL[5] = 0
+                self.FL[7] = 0
+            else:
+                self.FL[5] = 1
+                self.FL[6] = 0
+                self.FL[7] = 0
         else:
             raise Exception("Unsupported ALU operation")
 
