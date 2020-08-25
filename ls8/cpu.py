@@ -10,9 +10,14 @@ class CPU:
         self.ram = [None] * 256
         self.reg = [0] * 8
         self.pc = 0
-        self.LDI = 0b10000010
-        self.HLT = 0b00000001
-        self.PRN = 0b01000111
+        self.LDI = '10000010'
+        self.HLT = '00000001'
+        self.PRN = '01000111'
+        self.MUL = '10100010'
+        self.instructions_table = {}
+        self.instructions_table[self.LDI] = self.ldi
+        self.instructions_table[self.PRN] = self.prn
+        self.instructions_table[self.MUL] = self.mul
         pass
 
     def load(self):
@@ -27,13 +32,16 @@ class CPU:
         program_filename = sys.argv[1]
 
         program_text = open(program_filename).read()
+        # print('!!!', type(program_text))
         program_lines = program_text.split('\n')
         program = []
 
         for line in program_lines:
             blocks = line.split()
             if len(blocks) > 0:
-                program.append(blocks[0])
+                if blocks[0] != '#':
+                    inst = blocks[0]
+                    program.append(inst)
         
         # For now, we've just hardcoded a program:
 
@@ -51,18 +59,41 @@ class CPU:
             self.ram[address] = instruction
             address += 1
 
-    def ram_read(self, add):
+    def ram_read(self, add_str):
+        add = int(add_str, 2)
         return self.reg[add]
-    
-    def ram_write(self, add, value):
+
+    def ram_write(self, add_str, value_str):
+        add = int(add_str, 2)
+        value = int(value_str, 2)
         self.reg[add] = value
+    
+
+    def ldi(self):
+        add = self.ram[self.pc + 1]
+        value = self.ram[self.pc + 2]
+        self.ram_write(add, value)
+        self.pc += 3
+    
+    def prn(self):
+        add = self.ram[self.pc + 1]
+        value = self.ram_read(add)
+        print(value)
+        self.pc += 2
+    
+    def mul(self):
+        add1 = self.ram[self.pc + 1]
+        add2 = self.ram[self.pc + 2]
+        self.alu('MUL', int(add1, 2), int(add2, 2))
+        self.pc += 3
     
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
 
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
-        #elif op == "SUB": etc
+        elif op == "MUL":
+            self.reg[reg_a] *= self.reg[reg_b]
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -88,7 +119,6 @@ class CPU:
 
     def run(self):
         """Run the CPU."""
-        print('****', self.ram)
         inst = None
 
         running = True
@@ -96,17 +126,9 @@ class CPU:
         while running:
             inst = self.ram[self.pc]
 
-            if inst == self.LDI:
-                add = self.ram[self.pc + 1]
-                value = self.ram[self.pc + 2]
-                self.ram_write(add, value)
-                
-            elif inst == self.PRN:
-                add = self.ram[self.pc + 1]
-                value = self.ram_read(add)
-                print(value)
-                # self.pc += 1
+            if inst in self.instructions_table:
+                self.instructions_table[inst]()
             elif inst == self.HLT:
                 running = False
-            
-            self.pc += 1
+            else:
+                self.pc += 1
