@@ -10,14 +10,20 @@ class CPU:
         self.ram = [None] * 256
         self.reg = [0] * 8
         self.pc = 0
-        self.LDI = '10000010'
-        self.HLT = '00000001'
-        self.PRN = '01000111'
-        self.MUL = '10100010'
+        self.LDI = 0b10000010
+        self.HLT = 0b00000001
+        self.PRN = 0b01000111
+        self.MUL = 0b10100010
+        self.PUSH = 0b01000101
+        self.POP = 0b01000110
         self.instructions_table = {}
         self.instructions_table[self.LDI] = self.ldi
         self.instructions_table[self.PRN] = self.prn
         self.instructions_table[self.MUL] = self.mul
+        self.instructions_table[self.PUSH] = self.push
+        self.instructions_table[self.POP] = self.pop
+        self.sp = 0xF4
+        self.reg[7] = self.sp
         pass
 
     def load(self):
@@ -41,7 +47,7 @@ class CPU:
             if len(blocks) > 0:
                 if blocks[0] != '#':
                     inst = blocks[0]
-                    program.append(inst)
+                    program.append(int(inst, 2))
         
         # For now, we've just hardcoded a program:
 
@@ -59,34 +65,43 @@ class CPU:
             self.ram[address] = instruction
             address += 1
 
-    def ram_read(self, add_str):
-        add = int(add_str, 2)
-        return self.reg[add]
+    def ram_read(self, add):
+        return self.ram[add]
 
-    def ram_write(self, add_str, value_str):
-        add = int(add_str, 2)
-        value = int(value_str, 2)
-        self.reg[add] = value
+    def ram_write(self, add, value):
+        self.ram[add] = value
     
 
     def ldi(self):
         add = self.ram[self.pc + 1]
         value = self.ram[self.pc + 2]
-        self.ram_write(add, value)
+        self.reg[add] = value
         self.pc += 3
     
     def prn(self):
         add = self.ram[self.pc + 1]
-        value = self.ram_read(add)
+        value = self.reg[add]
         print(value)
         self.pc += 2
     
     def mul(self):
-        add1 = self.ram[self.pc + 1]
-        add2 = self.ram[self.pc + 2]
-        self.alu('MUL', int(add1, 2), int(add2, 2))
+        add1 = self.ram_read(self.pc + 1)
+        add2 = self.ram_read(self.pc + 2)
+        self.alu('MUL', add1, add2)
         self.pc += 3
     
+    def push(self):
+        add = self.ram_read(self.pc + 1)
+        self.sp -= 1
+        self.ram[self.sp] = self.reg[add]
+        self.pc += 2
+    
+    def pop(self):
+        add = self.ram_read(self.pc + 1)
+        self.reg[add] = self.ram[self.sp]
+        self.sp += 1
+        self.pc += 2
+
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
 
@@ -127,6 +142,7 @@ class CPU:
             inst = self.ram[self.pc]
 
             if inst in self.instructions_table:
+                # print('Instruction:', inst)
                 self.instructions_table[inst]()
             elif inst == self.HLT:
                 running = False
