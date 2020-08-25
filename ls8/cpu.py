@@ -9,25 +9,23 @@ class CPU:
         """Construct a new CPU."""
         self.ram = [None] * 256
         self.reg = [0] * 8
+        self.FL = [0] * 8
         self.pc = 0
-        self.LDI = 0b10000010
         self.HLT = 0b00000001
-        self.PRN = 0b01000111
-        self.MUL = 0b10100010
-        self.PUSH = 0b01000101
-        self.POP = 0b01000110
-        self.CALL = 0b01010000
-        self.RET = 0b00010001
-        self.ADD = 0b10100000
-        self.instructions_table = {}
-        self.instructions_table[self.LDI] = self.ldi
-        self.instructions_table[self.PRN] = self.prn
-        self.instructions_table[self.MUL] = self.mul
-        self.instructions_table[self.ADD] = self.add
-        self.instructions_table[self.PUSH] = self.push
-        self.instructions_table[self.POP] = self.pop
-        self.instructions_table[self.CALL] = self.call
-        self.instructions_table[self.RET] = self.ret
+        self.instructions_table = {
+            0b10000010: self.ldi,
+            0b01000111: self.prn,
+            0b01000101: self.push,
+            0b01000110: self.pop,
+            0b01010000: self.call,
+            0b01010001: self.ret,
+            0b01010100: self.jump,
+            0b01010101: self.jump_if_equal,
+            0b01010110: self.jump_if_not_equal,
+            0b10100000: self.add,
+            0b10100010: self.mul,
+            0b10100111: self.compare
+        }
         self.sp = 0xF4
         self.reg[7] = self.sp
         pass
@@ -128,15 +126,86 @@ class CPU:
         self.pc = self.reg[self.ram[self.pc + 1]]
     
     def jump(self):
-        # print('Jump')
-        self.pc = self.ram[self.pc + 1]
+        # print('Jump', self.reg[self.ram[self.pc + 1]])
+        self.pc = self.reg[self.ram[self.pc + 1]]
     
     def ret(self):
         # print('Return')
         self.pc = self.ram[self.sp]
         self.sp += 1
 
+    def compare(self):
+        add1 = self.ram_read(self.pc + 1)
+        add2 = self.ram_read(self.pc + 2)
+        # print('Compare')
+        self.alu('CMP', add1, add2)
+        self.pc += 3
+    
+    def jump_if_equal(self):
+        add = self.reg[self.ram[self.pc + 1]]
+        # print('Jump if equal', add)
+        if self.FL[7]:
+            self.pc = add
+        else:
+            self.pc += 2
+    
+    def jump_if_not_equal(self):
+        add = self.reg[self.ram[self.pc + 1]]
+        # print('Jump if not equal', add)
+        if self.FL[5] or self.FL[6]:
+            self.pc = add
+        else:
+            self.pc += 2
+    
+    def AND(self):
+        add1 = self.ram_read(self.pc + 1)
+        add2 = self.ram_read(self.pc + 2)
+        # print('AND')
+        self.alu('AND', add1, add2)
+        self.pc += 3
 
+    def NOT(self):
+        add1 = self.ram_read(self.pc + 1)
+        add2 = 0 # dummy value, will not be used
+        # print('NOT')
+        self.alu('NOT', add1, add2)
+        self.pc += 2
+
+    def OR(self):
+        add1 = self.ram_read(self.pc + 1)
+        add2 = self.ram_read(self.pc + 2)
+        # print('OR')
+        self.alu('OR', add1, add2)
+        self.pc += 3
+
+    def XOR(self):
+        add1 = self.ram_read(self.pc + 1)
+        add2 = self.ram_read(self.pc + 2)
+        # print('XOR')
+        self.alu('XOR', add1, add2)
+        self.pc += 3
+
+    def SHL(self):
+        add1 = self.ram_read(self.pc + 1)
+        add2 = self.ram_read(self.pc + 2)
+        # print('SHL')
+        self.alu('SHL', add1, add2)
+        self.pc += 3
+
+    def SHR(self):
+        add1 = self.ram_read(self.pc + 1)
+        add2 = self.ram_read(self.pc + 2)
+        # print('SHR')
+        self.alu('SHR', add1, add2)
+        self.pc += 3
+    
+    def ADDI(self):
+        add = self.ram_read(self.pc + 1)
+        value = self.ram_read(self.pc + 2)
+        # print('Add Immediate')
+        self.reg[add] = self.reg[add] + value
+        self.pc += 3
+    
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
 
@@ -144,6 +213,37 @@ class CPU:
             self.reg[reg_a] += self.reg[reg_b]
         elif op == "MUL":
             self.reg[reg_a] *= self.reg[reg_b]
+        elif op == "CMP":
+            if self.reg[reg_a] == self.reg[reg_b]:
+                self.FL[7] = 1
+                self.FL[5] = 0
+                self.FL[6] = 0
+            elif self.reg[reg_a] > self.reg[reg_b]:
+                self.FL[6] = 1
+                self.FL[5] = 0
+                self.FL[7] = 0
+            else:
+                self.FL[5] = 1
+                self.FL[6] = 0
+                self.FL[7] = 0
+        elif op == 'AND':
+            self.reg[reg_a] = self.reg[reg_a] and self.reg[reg_b]
+        elif op == 'NOT':
+            self.reg[reg_a] = not self.reg[reg_a]
+        elif op == 'OR':
+            self.reg[reg_a] = self.reg[reg_a] or self.reg[reg_b]
+        elif op == 'MOD':
+            if self.reg[reg_b] == 0:
+                print('0 division error')
+                self.running = False
+            else:
+                self.reg[reg_a] = self.reg[reg_a] % self.reg[reg_b]
+        elif op == 'XOR':
+            self.reg[reg_a] = self.reg[reg_a] ^ self.reg[reg_b]
+        elif op == 'SHL':
+            self.reg[reg_a] = self.reg[reg_a] << self.reg[reg_b]
+        elif op == 'SHR':
+            self.reg[reg_a] = self.reg[reg_a] >> self.reg[reg_b]
         else:
             raise Exception("Unsupported ALU operation")
 
